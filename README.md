@@ -1,3 +1,3 @@
 # My Project
 
-Short description.
+JCP Project
