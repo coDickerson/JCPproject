@@ -15,7 +15,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better styling
+# Custom CSS
 st.markdown("""
 <style>
     .main-header {
@@ -160,11 +160,11 @@ def predict_profitability(model, encoder, scaler, feature_names, user_inputs):
 data = load_data()
 
 # Title
-st.markdown('<p class="main-header">🚀 Startup Profitability Predictor</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-header"> Startup Profitability Predictor</p>', unsafe_allow_html=True)
 st.markdown("---")
 
 # Sidebar
-st.sidebar.header("📊 Startup Information")
+st.sidebar.header("Startup Information")
 
 # Industry selection with "None" option for all industries
 industries = ['None'] + sorted(data['Industry'].unique().tolist())
@@ -174,7 +174,7 @@ industry_selection = st.sidebar.selectbox(
     help="Select 'None' to use model trained on all industries"
 )
 
-st.sidebar.markdown("### 💰 Financial Metrics")
+st.sidebar.markdown("### Financial Metrics")
 
 funding_amount_selection = st.sidebar.slider(
     "Funding Amount (M USD)",
@@ -203,7 +203,7 @@ revenue_selection = st.sidebar.slider(
     format="%.1f"
 )
 
-st.sidebar.markdown("### 👥 Company Metrics")
+st.sidebar.markdown("### Company Metrics")
 
 employees_selection = st.sidebar.slider(
     "Number of Employees",
@@ -230,7 +230,7 @@ funding_rounds_selection = st.sidebar.slider(
     step=1
 )
 
-st.sidebar.markdown("### 🌍 Location & Status")
+st.sidebar.markdown("### Location & Status")
 
 # Get actual unique values from data
 regions = sorted(data['Region'].unique().tolist())
@@ -242,13 +242,13 @@ exit_status_selection = st.sidebar.selectbox("Exit Status", options=exit_statuse
 st.sidebar.markdown("---")
 
 # Train/Predict button
-predict_button = st.sidebar.button("🔮 Predict Profitability", type="primary", use_container_width=True)
+predict_button = st.sidebar.button("Predict Profitability", type="primary", use_container_width=True)
 
 # Main content area
 col1, col2 = st.columns([1.5, 1])
 
 with col1:
-    st.subheader("📈 Prediction Results")
+    st.subheader("Prediction Results")
     
     if predict_button:
         # Determine industry for model training
@@ -290,7 +290,7 @@ with col1:
                 if prediction == 1:
                     st.markdown(
                         f'<div class="prediction-box profitable">'
-                        f'<h2 style="color: #28a745;">✅ Predicted: PROFITABLE</h2>'
+                        f'<h2 style="color: #28a745;">Predicted: PROFITABLE</h2>'
                         f'<p style="font-size: 1.2rem;">The model predicts this startup will be profitable.</p>'
                         f'</div>',
                         unsafe_allow_html=True
@@ -298,7 +298,7 @@ with col1:
                 else:
                     st.markdown(
                         f'<div class="prediction-box not-profitable">'
-                        f'<h2 style="color: #dc3545;">❌ Predicted: NOT PROFITABLE</h2>'
+                        f'<h2 style="color: #dc3545;">Predicted: NOT PROFITABLE</h2>'
                         f'<p style="font-size: 1.2rem;">The model predicts this startup will not be profitable.</p>'
                         f'</div>',
                         unsafe_allow_html=True
@@ -326,10 +326,10 @@ with col1:
                 st.error(f"Error making prediction: {str(e)}")
                 st.exception(e)
     else:
-        st.info("👈 Fill in the startup information in the sidebar and click 'Predict Profitability' to get a prediction.")
+        st.info("Fill in the startup information in the sidebar and click 'Predict Profitability' to get a prediction.")
 
 with col2:
-    st.subheader("📋 Input Summary")
+    st.subheader("Input Summary")
     
     summary_data = {
         'Metric': [
@@ -359,21 +359,21 @@ with col2:
     summary_df = pd.DataFrame(summary_data)
     st.dataframe(summary_df, use_container_width=True, hide_index=True)
     
-    st.markdown("---")
-    st.markdown("### ℹ️ About")
-    st.markdown("""
-    This predictor uses a **Logistic Regression** model trained on startup data to predict profitability.
+#     st.markdown("---")
+#     st.markdown("### ℹ️ About")
+#     st.markdown("""
+#     This predictor uses a **Logistic Regression** model trained on startup data to predict profitability.
     
-    **Features Used:**
-    - Financial metrics (Funding, Valuation, Revenue)
-    - Company metrics (Employees, Market Share)
-    - Categorical features (Industry, Region, Exit Status)
+#     **Features Used:**
+#     - Financial metrics (Funding, Valuation, Revenue)
+#     - Company metrics (Employees, Market Share)
+#     - Categorical features (Industry, Region, Exit Status)
     
-    Select "None" for industry to use the full model trained on all industries.
-    """)
+#     Select "None" for industry to use the full model trained on all industries.
+#     """)
 
-# Footer
-st.markdown("---")
+# # Footer
+# st.markdown("---")
 st.markdown(
     "<div style='text-align: center; color: gray; padding: 1rem;'>"
     "Built with Streamlit | Startup Profitability Predictor</div>",
