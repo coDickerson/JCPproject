@@ -1,4 +1,5 @@
 import os
+import uuid
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -6,6 +7,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn import metrics
+from database import get_or_create_user, save_prediction, get_user_predictions, delete_prediction
 
 # Page configuration
 st.set_page_config(
@@ -43,6 +45,25 @@ st.markdown("""
         padding: 1rem;
         border-radius: 5px;
         margin: 0.5rem 0;
+    }
+    .history-table {
+        font-size: 0.95rem;
+    }
+    .profitable-badge {
+        background-color: #d4edda;
+        color: #155724;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-weight: 600;
+        display: inline-block;
+    }
+    .not-profitable-badge {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-weight: 600;
+        display: inline-block;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -159,6 +180,26 @@ def predict_profitability(model, encoder, scaler, feature_names, user_inputs):
 # Load data to get unique values
 data = load_data()
 
+# Initialize user session
+if 'session_id' not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
+
+if 'user_id' not in st.session_state:
+    try:
+        user = get_or_create_user(st.session_state.session_id)
+        st.session_state.user_id = user['id']
+        st.session_state.username = user.get('username', 'User')
+        st.session_state.supabase_enabled = True
+    except Exception as e:
+        # If Supabase is not configured, continue without database features
+        st.session_state.user_id = None
+        st.session_state.supabase_enabled = False
+        if 'supabase_warning_shown' not in st.session_state:
+            st.session_state.supabase_warning_shown = True
+            st.sidebar.warning("⚠️ Supabase not configured. Prediction history disabled.")
+else:
+    st.session_state.supabase_enabled = st.session_state.user_id is not None
+
 # Title
 st.markdown('<p class="main-header"> Startup Profitability Predictor</p>', unsafe_allow_html=True)
 st.markdown("---")
@@ -244,120 +285,214 @@ st.sidebar.markdown("---")
 # Train/Predict button
 predict_button = st.sidebar.button("Predict Profitability", type="primary", use_container_width=True)
 
-# Main content area
-col1, col2 = st.columns([1.5, 1])
+# Main content area with tabs
+tab1, tab2 = st.tabs(["🔮 Predict", "📊 History"])
 
-with col1:
-    st.subheader("Prediction Results")
+with tab1:
+    col1, col2 = st.columns([1.5, 1])
     
-    if predict_button:
-        # Determine industry for model training
-        if industry_selection == 'None':
-            model_industry = None
-            industry_for_prediction = data['Industry'].mode()[0]  # Use most common for encoding
-        else:
-            model_industry = industry_selection
-            industry_for_prediction = industry_selection
+    with col1:
+        st.subheader("Prediction Results")
         
-        # Train model
-        with st.spinner("Training model and making prediction..."):
-            try:
-                model, encoder, scaler, feature_names, accuracy, n_samples = train_model(industry=model_industry)
+        if predict_button:
+            # Determine industry for model training
+            if industry_selection == 'None':
+                model_industry = None
+                industry_for_prediction = data['Industry'].mode()[0]  # Use most common for encoding
+            else:
+                model_industry = industry_selection
+                industry_for_prediction = industry_selection
+            
+            # Train model
+            with st.spinner("Training model and making prediction..."):
+                try:
+                    model, encoder, scaler, feature_names, accuracy, n_samples = train_model(industry=model_industry)
+                    
+                    # Prepare user inputs
+                    user_inputs = {
+                        'funding_amount': funding_amount_selection,
+                        'valuation': valuation_selection,
+                        'revenue': revenue_selection,
+                        'employees': employees_selection,
+                        'market_share': market_share_selection,
+                        'funding_rounds': funding_rounds_selection,
+                        'industry': industry_for_prediction,
+                        'region': region_selection,
+                        'exit_status': exit_status_selection
+                    }
+                    
+                    # Make prediction
+                    prediction, probability = predict_profitability(
+                        model, encoder, scaler, feature_names, user_inputs
+                    )
+                    
+                    # Display results
+                    prob_profitable = probability[1] * 100
+                    prob_not_profitable = probability[0] * 100
+                    
+                    # Prediction box
+                    if prediction == 1:
+                        st.markdown(
+                            f'<div class="prediction-box profitable">'
+                            f'<h2 style="color: #28a745;">Predicted: PROFITABLE</h2>'
+                            f'<p style="font-size: 1.2rem;">The model predicts this startup will be profitable.</p>'
+                            f'</div>',
+                            unsafe_allow_html=True
+                        )
+                    else:
+                        st.markdown(
+                            f'<div class="prediction-box not-profitable">'
+                            f'<h2 style="color: #dc3545;">Predicted: NOT PROFITABLE</h2>'
+                            f'<p style="font-size: 1.2rem;">The model predicts this startup will not be profitable.</p>'
+                            f'</div>',
+                            unsafe_allow_html=True
+                        )
+                    
+                    # Probability metrics
+                    col_prob1, col_prob2 = st.columns(2)
+                    with col_prob1:
+                        st.metric("Probability of Profitability", f"{prob_profitable:.1f}%")
+                        st.progress(prob_profitable / 100)
+                    
+                    with col_prob2:
+                        st.metric("Probability of Not Profitability", f"{prob_not_profitable:.1f}%")
+                        st.progress(prob_not_profitable / 100)
+                    
+                    # Model info
+                    st.markdown("---")
+                    st.info(f"**Model Information:** Trained on {n_samples} startups | Test Accuracy: {accuracy:.1%}")
+                    if model_industry:
+                        st.info(f"**Industry Filter:** {model_industry}")
+                    else:
+                        st.info("**Industry Filter:** All Industries (Full Dataset)")
+                    
+                    # Save prediction to database
+                    if st.session_state.supabase_enabled:
+                        try:
+                            saved_prediction = save_prediction(
+                                st.session_state.user_id,
+                                user_inputs,
+                                prediction,
+                                prob_profitable,
+                                model_industry
+                            )
+                            if saved_prediction:
+                                st.success("✅ Prediction saved to your history!")
+                        except Exception as db_error:
+                            st.warning(f"⚠️ Could not save prediction to database: {str(db_error)}")
+                        
+                except Exception as e:
+                    st.error(f"Error making prediction: {str(e)}")
+                    st.exception(e)
+        else:
+            st.info("Fill in the startup information in the sidebar and click 'Predict Profitability' to get a prediction.")
+    
+    with col2:
+        st.subheader("Input Summary")
+        
+        summary_data = {
+            'Metric': [
+                'Industry',
+                'Funding Rounds',
+                'Region',
+                'Exit Status',
+                'Funding Amount (M USD)',
+                'Valuation (M USD)',
+                'Revenue (M USD)',
+                'Employees',
+                'Market Share (%)'
+            ],
+            'Value': [
+                industry_selection if industry_selection != 'None' else 'All Industries',
+                funding_rounds_selection,
+                region_selection,
+                exit_status_selection,
+                f"${funding_amount_selection:.1f}M",
+                f"${valuation_selection:.1f}M",
+                f"${revenue_selection:.1f}M",
+                f"{employees_selection:,}",
+                f"{market_share_selection:.1f}%"
+            ]
+        }
+        
+        summary_df = pd.DataFrame(summary_data)
+        st.dataframe(summary_df, use_container_width=True, hide_index=True)
+
+with tab2:
+    st.subheader("📊 Prediction History")
+    
+    if st.session_state.supabase_enabled:
+        try:
+            history = get_user_predictions(st.session_state.user_id, limit=50)
+            
+            if history:
+                # Create compact summary table
+                summary_rows = []
+                for idx, pred in enumerate(history):
+                    summary_rows.append({
+                        '#': len(history) - idx,
+                        'Date': pred['created_at'][:19].replace('T', ' '),
+                        'Industry': pred['industry'],
+                        'Region': pred['region'],
+                        'Funding (M)': f"${pred['funding_amount']:.1f}",
+                        'Valuation (M)': f"${pred['valuation']:.1f}",
+                        'Prediction': '✅ Profitable' if pred['predicted_profitable'] else '❌ Not Profitable',
+                        'Probability': f"{pred['probability']:.1f}%",
+                        'ID': pred['id']  # Hidden, used for deletion
+                    })
                 
-                # Prepare user inputs
-                user_inputs = {
-                    'funding_amount': funding_amount_selection,
-                    'valuation': valuation_selection,
-                    'revenue': revenue_selection,
-                    'employees': employees_selection,
-                    'market_share': market_share_selection,
-                    'funding_rounds': funding_rounds_selection,
-                    'industry': industry_for_prediction,
-                    'region': region_selection,
-                    'exit_status': exit_status_selection
-                }
+                summary_df = pd.DataFrame(summary_rows)
                 
-                # Make prediction
-                prediction, probability = predict_profitability(
-                    model, encoder, scaler, feature_names, user_inputs
+                # Display summary table
+                st.markdown("### 📋 Prediction History")
+                st.dataframe(
+                    summary_df.drop(columns=['ID']),
+                    use_container_width=True,
+                    hide_index=True
                 )
                 
-                # Display results
-                prob_profitable = probability[1] * 100
-                prob_not_profitable = probability[0] * 100
-                
-                # Prediction box
-                if prediction == 1:
-                    st.markdown(
-                        f'<div class="prediction-box profitable">'
-                        f'<h2 style="color: #28a745;">Predicted: PROFITABLE</h2>'
-                        f'<p style="font-size: 1.2rem;">The model predicts this startup will be profitable.</p>'
-                        f'</div>',
-                        unsafe_allow_html=True
-                    )
-                else:
-                    st.markdown(
-                        f'<div class="prediction-box not-profitable">'
-                        f'<h2 style="color: #dc3545;">Predicted: NOT PROFITABLE</h2>'
-                        f'<p style="font-size: 1.2rem;">The model predicts this startup will not be profitable.</p>'
-                        f'</div>',
-                        unsafe_allow_html=True
-                    )
-                
-                # Probability metrics
-                col_prob1, col_prob2 = st.columns(2)
-                with col_prob1:
-                    st.metric("Probability of Profitability", f"{prob_profitable:.1f}%")
-                    st.progress(prob_profitable / 100)
-                
-                with col_prob2:
-                    st.metric("Probability of Not Profitability", f"{prob_not_profitable:.1f}%")
-                    st.progress(prob_not_profitable / 100)
-                
-                # Model info
+                # Add delete functionality with expandable sections
                 st.markdown("---")
-                st.info(f"**Model Information:** Trained on {n_samples} startups | Test Accuracy: {accuracy:.1%}")
-                if model_industry:
-                    st.info(f"**Industry Filter:** {model_industry}")
-                else:
-                    st.info("**Industry Filter:** All Industries (Full Dataset)")
-                    
-            except Exception as e:
-                st.error(f"Error making prediction: {str(e)}")
-                st.exception(e)
+                st.markdown("### 🗑️ Delete Predictions")
+                
+                # Create expandable sections for each prediction to delete
+                for idx, pred in enumerate(history):
+                    with st.expander(f"Delete Prediction #{len(history) - idx} - {pred['created_at'][:19].replace('T', ' ')}"):
+                        col_info, col_delete = st.columns([3, 1])
+                        with col_info:
+                            st.write(f"**Industry:** {pred['industry']} | **Region:** {pred['region']} | **Prediction:** {'✅ Profitable' if pred['predicted_profitable'] else '❌ Not Profitable'}")
+                        with col_delete:
+                            if st.button("Delete", key=f"delete_{pred['id']}", type="secondary"):
+                                try:
+                                    delete_prediction(pred['id'])
+                                    st.success("Prediction deleted! Refreshing...")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Error deleting prediction: {str(e)}")
+                
+            else:
+                st.info("No prediction history yet. Make your first prediction to see it here!")
+                st.markdown("""
+                **How to get started:**
+                1. Go to the **Predict** tab
+                2. Fill in startup information in the sidebar
+                3. Click "Predict Profitability"
+                4. Your predictions will be saved here automatically!
+                """)
+                
+        except Exception as e:
+            st.error(f"Could not load prediction history: {str(e)}")
+            st.exception(e)
     else:
-        st.info("Fill in the startup information in the sidebar and click 'Predict Profitability' to get a prediction.")
-
-with col2:
-    st.subheader("Input Summary")
-    
-    summary_data = {
-        'Metric': [
-            'Industry',
-            'Funding Rounds',
-            'Region',
-            'Exit Status',
-            'Funding Amount (M USD)',
-            'Valuation (M USD)',
-            'Revenue (M USD)',
-            'Employees',
-            'Market Share (%)'
-        ],
-        'Value': [
-            industry_selection if industry_selection != 'None' else 'All Industries',
-            funding_rounds_selection,
-            region_selection,
-            exit_status_selection,
-            f"${funding_amount_selection:.1f}M",
-            f"${valuation_selection:.1f}M",
-            f"${revenue_selection:.1f}M",
-            f"{employees_selection:,}",
-            f"{market_share_selection:.1f}%"
-        ]
-    }
-    
-    summary_df = pd.DataFrame(summary_data)
-    st.dataframe(summary_df, use_container_width=True, hide_index=True)
+        st.warning("⚠️ Supabase is not configured. Prediction history is disabled.")
+        st.markdown("""
+        To enable prediction history:
+        1. Set up your Supabase project
+        2. Add your credentials to a `.env` file
+        3. Run the SQL schema in your Supabase SQL Editor
+        
+        See the README for detailed instructions.
+        """)
     
 #     st.markdown("---")
 #     st.markdown("### ℹ️ About")
