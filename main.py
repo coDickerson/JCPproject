@@ -1,4 +1,5 @@
 import os
+from uuid import uuid4
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -8,6 +9,13 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn import metrics
+
+from database import (
+    delete_prediction,
+    get_or_create_user,
+    get_user_predictions,
+    save_prediction,
+)
 
 # Page configuration
 st.set_page_config(
@@ -29,7 +37,7 @@ div[data-testid="stAlert"] p {
 """, unsafe_allow_html=True)
 
 
-# Custom CSS for better styling
+# Custom CSS for styling (original scheme)
 st.markdown("""
 <style>
     .main-header {
@@ -247,6 +255,25 @@ def predict_profitability_all_models(model_results, encoder, scaler, feature_nam
     
     return best_model_name, best_model_result['prediction'], best_model_result['probability'], all_model_predictions
 
+
+def init_supabase_session():
+    """Initialize Supabase-related session state."""
+    if st.session_state.get("supabase_checked"):
+        return
+
+    st.session_state.session_id = st.session_state.get("session_id", str(uuid4()))
+    st.session_state.supabase_enabled = False
+    st.session_state.supabase_error = ""
+
+    try:
+        user = get_or_create_user(st.session_state.session_id)
+        st.session_state.user_id = user["id"]
+        st.session_state.supabase_enabled = True
+    except Exception as exc:  # Leave the app usable without Supabase
+        st.session_state.supabase_error = str(exc)
+
+    st.session_state.supabase_checked = True
+
 # Load data to get unique values
 try:
     data = load_data()
@@ -255,6 +282,9 @@ except Exception as e:
     st.error(f"⚠️ Error loading data: {str(e)}")
     st.error("Please ensure 'startup_data.csv' exists in the project directory.")
     data = pd.DataFrame()  # Empty dataframe as fallback
+
+# Initialize Supabase (non-blocking if credentials are missing)
+init_supabase_session()
 
 # Title
 st.markdown(
@@ -548,83 +578,8 @@ with col1:
                 except Exception as e:
                     st.error(f"Error making prediction: {str(e)}")
                     st.exception(e)
-    if predict_button:
-        # Determine industry for model training
-        if industry_selection == 'None':
-            model_industry = None
-            industry_for_prediction = data['Industry'].mode()[0]  # Use most common for encoding
         else:
-            model_industry = industry_selection
-            industry_for_prediction = industry_selection
-        
-        # Train model
-        with st.spinner("Training model and making prediction..."):
-            try:
-                model, encoder, scaler, feature_names, accuracy, n_samples = train_model(industry=model_industry)
-                
-                # Prepare user inputs
-                user_inputs = {
-                    'funding_amount': funding_amount_selection,
-                    'valuation': valuation_selection,
-                    'revenue': revenue_selection,
-                    'employees': employees_selection,
-                    'market_share': market_share_selection,
-                    'funding_rounds': funding_rounds_selection,
-                    'industry': industry_for_prediction,
-                    'region': region_selection,
-                    'exit_status': exit_status_selection
-                }
-                
-                # Make prediction
-                prediction, probability = predict_profitability(
-                    model, encoder, scaler, feature_names, user_inputs
-                )
-                
-                # Display results
-                prob_profitable = probability[1] * 100
-                prob_not_profitable = probability[0] * 100
-                
-                # Prediction box
-                if prediction == 1:
-                    st.markdown(
-                        f'<div class="prediction-box profitable">'
-                        f'<h2 style="color: #28a745;">✅ Predicted: PROFITABLE</h2>'
-                        f'<p style="font-size: 1.2rem;">The model predicts this startup will be profitable.</p>'
-                        f'</div>',
-                        unsafe_allow_html=True
-                    )
-                else:
-                    st.markdown(
-                        f'<div class="prediction-box not-profitable">'
-                        f'<h2 style="color: #dc3545;">❌ Predicted: NOT PROFITABLE</h2>'
-                        f'<p style="font-size: 1.2rem;">The model predicts this startup will not be profitable.</p>'
-                        f'</div>',
-                        unsafe_allow_html=True
-                    )
-                
-                # Probability metrics
-                col_prob1, col_prob2 = st.columns(2)
-                with col_prob1:
-                    st.metric("Probability of Profitability", f"{prob_profitable:.1f}%")
-                    st.progress(prob_profitable / 100)
-                
-                with col_prob2:
-                    st.metric("Probability of Not Profitability", f"{prob_not_profitable:.1f}%")
-                    st.progress(prob_not_profitable / 100)
-                
-                # Model info
-                st.markdown("---")
-                st.info(f"**Model Information:** Trained on {n_samples} startups | Test Accuracy: {accuracy:.1%}")
-                if model_industry:
-                    st.info(f"**Industry Filter:** {model_industry}")
-                else:
-                    st.info("**Industry Filter:** All Industries (Full Dataset)")
-                    
-            except Exception as e:
-                st.error(f"Error making prediction: {str(e)}")
-                st.exception(e)
-    else:
-        st.info("👈 Fill in the startup information in the sidebar and click 'Predict Profitability' to get a prediction.")
+            st.info("👈 Fill in the startup information in the sidebar and click 'Predict Profitability' to get a prediction.")
 
 with col2:
     st.subheader("📋 Input Summary")
@@ -657,7 +612,43 @@ with col2:
     summary_df = pd.DataFrame(summary_data)
     st.dataframe(summary_df, use_container_width=True, hide_index=True)
 
-    
+    st.markdown("---")
+    st.subheader("🕑 Prediction History")
+    if st.session_state.supabase_enabled:
+        history = get_user_predictions(st.session_state.user_id, limit=5)
+        if history:
+            for record in history:
+                with st.container():
+                    st.markdown(
+                        f"<div class='history-card'>"
+                        f"<div class='title'>{record.get('created_at', '')[:19]}</div>"
+                        f"<div class='meta'>"
+                        f"{record.get('industry', 'N/A')} • "
+                        f"${record.get('funding_amount', 0):,.1f}M • "
+                        f"{record.get('employees', 0)} employees"
+                        f"</div>"
+                        f"<div class='{ 'profit' if record.get('predicted_profitable') else 'loss' }'>"
+                        f"{'Profitable' if record.get('predicted_profitable') else 'Not Profitable'}"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
+                    delete_key = f"del_{record.get('id')}"
+                    if st.button("Delete", key=delete_key):
+                        try:
+                            delete_prediction(record.get("id"))
+                            st.success("Deleted from history.")
+                            st.experimental_rerun()
+                        except Exception as delete_error:
+                            st.warning(f"Could not delete: {delete_error}")
+                    st.markdown("</div>", unsafe_allow_html=True)
+        else:
+            st.caption("No predictions saved yet.")
+    else:
+        if st.session_state.supabase_error:
+            st.warning(f"Supabase disabled: {st.session_state.supabase_error}")
+        else:
+            st.caption("Connect Supabase to enable prediction history.")
+
     st.markdown("---")
     st.markdown("### ℹ️ About")
     st.markdown("""
