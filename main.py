@@ -619,11 +619,13 @@ with col2:
         if history:
             for record in history:
                 with st.container():
+                    # Display model_industry, or "All Industries" if None/empty
+                    model_industry_display = record.get('model_industry') or 'All Industries'
                     st.markdown(
                         f"<div class='history-card'>"
                         f"<div class='title'>{record.get('created_at', '')[:19]}</div>"
                         f"<div class='meta'>"
-                        f"{record.get('industry', 'N/A')} • "
+                        f"{model_industry_display} • "
                         f"${record.get('funding_amount', 0):,.1f}M • "
                         f"{record.get('employees', 0)} employees"
                         f"</div>"
