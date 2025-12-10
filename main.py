@@ -346,7 +346,6 @@ col1, col2 = st.columns([1.5, 1])
 with col1:
     st.subheader("📈 Prediction Results")
     
-<<<<<<< Updated upstream
     with col1:
         st.subheader("Prediction Results")
         
@@ -528,13 +527,11 @@ with col1:
                 except Exception as e:
                     st.error(f"Error making prediction: {str(e)}")
                     st.exception(e)
-=======
     if predict_button:
         # Determine industry for model training
         if industry_selection == 'None':
             model_industry = None
             industry_for_prediction = data['Industry'].mode()[0]  # Use most common for encoding
->>>>>>> Stashed changes
         else:
             model_industry = industry_selection
             industry_for_prediction = industry_selection
