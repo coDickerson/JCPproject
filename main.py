@@ -17,6 +17,18 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# Make the information text in st.info darker for better readability
+st.markdown("""
+<style>
+
+/* Target the text inside the alert */
+div[data-testid="stAlert"] p {
+    color: #3F4137 !important;        /* Text color */
+}
+</style>
+""", unsafe_allow_html=True)
+
+
 # Custom CSS for better styling
 st.markdown("""
 <style>
@@ -245,7 +257,10 @@ except Exception as e:
     data = pd.DataFrame()  # Empty dataframe as fallback
 
 # Title
-st.markdown('<p class="main-header">🚀 Startup Profitability Predictor</p>', unsafe_allow_html=True)
+st.markdown(
+    '<p class="main-header" style="color:#3F4137;">🚀 Startup Profitability Predictor</p>',
+    unsafe_allow_html=True
+)
 st.markdown("---")
 
 # Sidebar
@@ -641,6 +656,7 @@ with col2:
     
     summary_df = pd.DataFrame(summary_data)
     st.dataframe(summary_df, use_container_width=True, hide_index=True)
+
     
     st.markdown("---")
     st.markdown("### ℹ️ About")

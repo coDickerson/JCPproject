@@ -1,7 +1,7 @@
 [theme]                     # This header tells Streamlit you are defining theme settings
 base="dark"                 # Choose the base theme: "dark" or "light"
-primaryColor="#3F4137"      # Color for buttons, sliders, highlights
-backgroundColor="#B7B7A4"   # Background color of the main page
-secondaryBackgroundColor="#A5A58D"  # Background color of the sidebar
+primaryColor="#C2C5AA"      # Color for buttons, sliders, highlights
+backgroundColor="#C2C5AA"   # Background color of the main page
+secondaryBackgroundColor="#656D4A"  # Background color of the sidebar
 textColor="#3F4137"          # Default text color
 font="sans serif"            # Font: "sans serif", "serif", or "monospace"
