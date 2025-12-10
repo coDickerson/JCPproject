@@ -14,7 +14,7 @@ st.set_page_config(
     page_title="Startup Profitability Predictor",
     page_icon="🚀",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
 # Custom CSS for better styling
@@ -454,9 +454,15 @@ with col1:
                                 model_conf = model_data['confidence'] * 100
                                 
                                 if model_pred == 1:
-                                    st.success(f"**{model_name}**\n✅ Profitable")
+                                    st.markdown(
+                                    f"**{model_name}** <span style='color:green'>✅ Profitable</span>",
+                                    unsafe_allow_html=True
+                                    )
                                 else:
-                                    st.error(f"**{model_name}**\n❌ Not Profitable")
+                                    st.markdown(
+                                    f"**{model_name}** <span style='color:red'>❌ Not Profitable</span>",
+                                    unsafe_allow_html=True
+                                    )
                                 
                                 st.caption(f"Confidence: {model_conf:.1f}%")
                                 st.caption(f"Prob Profitable: {model_prob[1]*100:.1f}%")
