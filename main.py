@@ -31,7 +31,7 @@ st.markdown("""
 
 /* Target the text inside the alert */
 div[data-testid="stAlert"] p {
-    color: #3F4137 !important;        /* Text color */
+    color: #babbb8ff !important;        /* Text color */
 }
 </style>
 """, unsafe_allow_html=True)
@@ -288,7 +288,7 @@ init_supabase_session()
 
 # Title
 st.markdown(
-    '<p class="main-header" style="color:#3F4137;">🚀 Startup Profitability Predictor</p>',
+    '<p class="main-header" style="color:#babbb8ff;">🚀 Startup Profitability Predictor</p>',
     unsafe_allow_html=True
 )
 st.markdown("---")
@@ -445,8 +445,8 @@ with col1:
                         st.markdown(
                             f'<div class="prediction-box profitable">'
                             f'<h2 style="color: #28a745;">Predicted: PROFITABLE</h2>'
-                            f'<p style="font-size: 1.2rem;">Using <strong>{best_model_name}</strong> (Best Weighted Score: {weighted_score:.1%})</p>'
-                            f'<p style="font-size: 0.9rem; color: #666;">Model Confidence: {confidence:.1f}% | Precision: {precision:.1%} | Recall: {recall:.1%}</p>'
+                            f'<p style="font-size: 1.2rem; color: #191C24;">Using <strong>{best_model_name}</strong> (Best Weighted Score: {weighted_score:.1%})</p>'
+                            f'<p style="font-size: 0.9rem; color: #191C24;">Model Confidence: {confidence:.1f}% | Precision: {precision:.1%} | Recall: {recall:.1%}</p>'
                             f'</div>',
                             unsafe_allow_html=True
                         )
@@ -454,8 +454,8 @@ with col1:
                         st.markdown(
                             f'<div class="prediction-box not-profitable">'
                             f'<h2 style="color: #dc3545;">Predicted: NOT PROFITABLE</h2>'
-                            f'<p style="font-size: 1.2rem;">Using <strong>{best_model_name}</strong> (Best Weighted Score: {weighted_score:.1%})</p>'
-                            f'<p style="font-size: 0.9rem; color: #666;">Model Confidence: {confidence:.1f}% | Precision: {precision:.1%} | Recall: {recall:.1%}</p>'
+                            f'<p style="font-size: 1.2rem; color: #191C24;">Using <strong>{best_model_name}</strong> (Best Weighted Score: {weighted_score:.1%})</p>'
+                            f'<p style="font-size: 0.9rem; color: #191C24;">Model Confidence: {confidence:.1f}% | Precision: {precision:.1%} | Recall: {recall:.1%}</p>'
                             f'</div>',
                             unsafe_allow_html=True
                         )
